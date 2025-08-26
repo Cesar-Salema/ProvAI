@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  provai_db:
+    image: postgres:15-alpine
+    container_name: provai_db
+    environment:
+      POSTGRES_DB: provai_db
+      POSTGRES_USER: provai_user
+      POSTGRES_PASSWORD: provai_pass_2024
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - provai_network
+
+  provai_redis:
+    image: redis:7-alpine
+    container_name: provai_redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - provai_network
+
+  provai_ollama:
+    image: ollama/ollama
+    container_name: provai_ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_ORIGINS=*
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - provai_network
+
+  provai_backend:
+    build: ./provai-backend
+    container_name: provai_backend
+    environment:
+      - DATABASE_URL=postgresql://provai_user:provai_pass_2024@provai_db:5432/provai_db
+      - REDIS_URL=redis://provai_redis:6379/0
+      - OLLAMA_URL=http://provai_ollama:11434
+      - JWT_SECRET_KEY=sua_chave_jwt_super_secreta_2024
+    ports:
+      - "5000:5000"
+    depends_on:
+      - provai_db
+      - provai_redis
+      - provai_ollama
+    networks:
+      - provai_network
+
+  provai_frontend:
+    build: ./provai-frontend
+    container_name: provai_frontend
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - provai_backend
+    networks:
+      - provai_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
+
+networks:
+  provai_network:
+    driver: bridge
